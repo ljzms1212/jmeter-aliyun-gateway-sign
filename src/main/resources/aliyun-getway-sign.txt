@@ -1,0 +1,64 @@
+
+import org.apache.jmeter.protocol.http.control.HeaderManager;
+import org.apache.jmeter.protocol.http.control.Header;
+import org.apache.jmeter.testelement.property.CollectionProperty;
+import org.apache.jmeter.testelement.property.JMeterProperty;
+import org.apache.jmeter.protocol.http.util.HTTPArgument;
+import org.apache.jmeter.config.Arguments;
+
+import com.jmeter.aliyun.sign.util.*;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.*;
+
+//log.info("appKey :"+vars.get("appKey"));
+String appKey = vars.get("appKey");
+String appSecrect = vars.get("appSecrect");
+
+//获取请求方法返回值为大写GET
+String method = sampler.getMethod();
+
+log.info("method :" + method);
+
+//获取请求路径
+String path = sampler.getUrl().getPath();
+log.info("path :" + path);
+
+//sampler 里面有个getHeaderManager 可以获得请求头
+HeaderManager headers =sampler.getHeaderManager();
+// 打印全部的头部内容
+log.info("headers: " + headers.getHeaders().getStringValue());
+
+//header params
+CollectionProperty collect =  headers.getHeaders();
+Map params = new HashMap();
+for(int i =0 ;i < collect.size() ; i++){
+	JMeterProperty prop=collect.get(i);
+	//log.info("Key = " + prop.getClass());
+	String name = prop.getElement().getName();
+
+	//log.info("Key = " + name);
+	//log.info("value = " + prop.getElement().getValue());
+	params.put(prop.getElement().getName().trim(),prop.getElement().getValue().trim()) ;
+}
+
+//暂时不校验请求的 queryparams
+//生成秘钥
+HashMap headerMap = SignUtil.sign(appKey, appSecrect, method, path, params, new HashMap());
+
+
+//修改 header ,并加入 tooken
+for (String key : headerMap.keySet()) {
+	//HeaderManager
+	headers.removeHeaderNamed(key);
+
+	//new 一个Header对象
+	Header signHeader = new Header(key, headerMap.get(key));
+
+	// 添加 Header 到请求头管理器
+	headers.add(signHeader);
+}
+
+// 打印全部的头部内容
+log.info("new header"+headers.getHeaders().getStringValue());
