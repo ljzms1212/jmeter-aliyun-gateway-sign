@@ -61,6 +61,7 @@ nbdist/
 *.nar
 *.ear
 *.zip
+!/source/aliyun-getway-sign.zip
 *.tar.gz
 *.rar
 
