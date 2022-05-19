@@ -18,14 +18,14 @@ public class SignUtilTest {
     @Test
     void sign() {
 
-        Map<String, String> headerMap = new SignUtil().sign("111", "1000",
-                "POST", "/ttt", new HashMap<>(), new HashMap<>());
+        Map<String, String> headerMap = new SignUtil ().sign (
+                "111", "1000", "POST", "/ttt", new HashMap<> (), "customerId=1&temp=2 ", null);
 
-        assertNotNull(headerMap);
+        assertNotNull (headerMap);
 
-        for (String key : headerMap.keySet()) {
+        for (String key : headerMap.keySet ()) {
 
-            System.out.println("Key = " + key + ",Value = " + headerMap.get(key));
+            System.out.println ("Key = " + key + ",Value = " + headerMap.get (key));
 
         }
     }

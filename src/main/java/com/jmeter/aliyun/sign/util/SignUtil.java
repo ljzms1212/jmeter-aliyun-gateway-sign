@@ -16,28 +16,33 @@ import java.util.*;
 public class SignUtil {
 
     /**
-     * @param appKey 阿里云应用key
-     * @param appSecret 阿里云应用密码
-     * @param method http 请求谓词
-     * @param path 请求地址
-     * @param headers 头部信息
-     * @param querys 请求参数，可不传
+     * @param appKey       阿里云应用key
+     * @param appSecret    阿里云应用密码
+     * @param method       http 请求谓词
+     * @param path         请求地址
+     * @param headers      头部信息
+     * @param queryString  请求参数，可不传  //customerId=1&temp=2%20
+     * @param bodyString   请求的 body ，(form 表单提交时，需要将 bodys 当作加密因子之一； json 提交时，不会当作加密因子)
      * @return 返回阿里云网关鉴权必要 header 信息
-     * */
+     */
     public static Map<String, String> sign(
             String appKey,
             String appSecret,
             String method,
             String path,
             Map<String, String> headers,
-            Map<String, String> querys) {
+            String queryString,
+            String bodyString) {
+
+        Map<String, String> querys = convertToMap (queryString);
+        Map<String, String> bodys = convertToMap (bodyString);
 
         //body 可不参与加密
-        headers.put(AliyunGatewayHttpConstants.X_CA_TIMESTAMP, String.valueOf(System.currentTimeMillis()));
-        headers.put(AliyunGatewayHttpConstants.X_CA_NONCE, UUID.randomUUID().toString());
-        headers.put(AliyunGatewayHttpConstants.X_CA_KEY, appKey);
-        headers.put(AliyunGatewayHttpConstants.X_CA_SIGNATURE,
-                SignUtil.sign(appSecret, method, path, headers, querys, null, null));
+        headers.put (AliyunGatewayHttpConstants.X_CA_TIMESTAMP, String.valueOf (System.currentTimeMillis ()));
+        headers.put (AliyunGatewayHttpConstants.X_CA_NONCE, UUID.randomUUID ().toString ());
+        headers.put (AliyunGatewayHttpConstants.X_CA_KEY, appKey);
+        headers.put (AliyunGatewayHttpConstants.X_CA_SIGNATURE,
+                SignUtil.sign (appSecret, method, path, headers, querys, bodys, null));
 
         return headers;
     }
@@ -49,8 +54,8 @@ public class SignUtil {
      * @param method               HttpMethod
      * @param path
      * @param headers
-     * @param querys
-     * @param bodys
+     * @param querys               get 请求的查询参数
+     * @param bodys                请求的body ，(form 表单提交时，需要将 bodys 当作加密因子之一； json 提交时，不会当作加密因子)
      * @param signHeaderPrefixList 自定义参与签名Header前缀
      * @return 签名后的字符串
      */
@@ -63,16 +68,20 @@ public class SignUtil {
             Map<String, String> bodys,
             List<String> signHeaderPrefixList) {
         try {
-            Mac hmacSha256 = Mac.getInstance(AliyunGatewayHttpConstants.HMAC_SHA256);
-            byte[] keyBytes = secret.getBytes(CharsetConstants.UTF_8);
-            hmacSha256.init(new SecretKeySpec(keyBytes, 0, keyBytes.length, AliyunGatewayHttpConstants.HMAC_SHA256));
-            byte[] doFinal = hmacSha256.doFinal(buildStringToSign(method, path, headers, querys, bodys, signHeaderPrefixList).getBytes(CharsetConstants.UTF_8));
+
+            Mac hmacSha256 = Mac.getInstance (AliyunGatewayHttpConstants.HMAC_SHA256);
+            byte[] keyBytes = secret.getBytes (CharsetConstants.UTF_8);
+            hmacSha256.init (new SecretKeySpec (keyBytes, 0, keyBytes.length, AliyunGatewayHttpConstants.HMAC_SHA256));
+
+            byte[] doFinal = hmacSha256.doFinal (buildStringToSign (method, path, headers, querys, bodys, signHeaderPrefixList).getBytes (CharsetConstants.UTF_8));
+
 //            log.debug("doFinal.length={}",doFinal==null?0:doFinal.length);
-            return new String(Base64.encodeBase64(doFinal), CharsetConstants.UTF_8);
+            return new String (Base64.encodeBase64 (doFinal), CharsetConstants.UTF_8);
+
         } catch (Exception e) {
 //            log.error("计算签名异常：secret={},method={},path={},headers={},querys={},bodys={},signHeaderPrefixList={},详情错误:",
 //                    secret,method,path,headers,querys,bodys,signHeaderPrefixList,e);
-            throw new RuntimeException(e);
+            throw new RuntimeException (e);
         }
     }
 
@@ -82,8 +91,8 @@ public class SignUtil {
      * @param method
      * @param path
      * @param headers
-     * @param querys
-     * @param bodys
+     * @param querys               get 请求的查询参数
+     * @param bodys                表单提交，需要提供
      * @param signHeaderPrefixList
      * @return
      */
@@ -92,31 +101,31 @@ public class SignUtil {
                                             Map<String, String> querys,
                                             Map<String, String> bodys,
                                             List<String> signHeaderPrefixList) {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder ();
 
-        sb.append(method.toUpperCase()).append(SymbolConstants.LF);
+        sb.append (method.toUpperCase ()).append (SymbolConstants.LF);
         if (null != headers) {
-            if (null != headers.get(AliyunGatewayHttpConstants.HTTP_HEADER_ACCEPT)) {
-                sb.append(headers.get(AliyunGatewayHttpConstants.HTTP_HEADER_ACCEPT));
+            if (null != headers.get (AliyunGatewayHttpConstants.HTTP_HEADER_ACCEPT)) {
+                sb.append (headers.get (AliyunGatewayHttpConstants.HTTP_HEADER_ACCEPT));
             }
-            sb.append(SymbolConstants.LF);
-            if (null != headers.get(AliyunGatewayHttpConstants.HTTP_HEADER_CONTENT_MD5)) {
-                sb.append(headers.get(AliyunGatewayHttpConstants.HTTP_HEADER_CONTENT_MD5));
+            sb.append (SymbolConstants.LF);
+            if (null != headers.get (AliyunGatewayHttpConstants.HTTP_HEADER_CONTENT_MD5)) {
+                sb.append (headers.get (AliyunGatewayHttpConstants.HTTP_HEADER_CONTENT_MD5));
             }
-            sb.append(SymbolConstants.LF);
-            if (null != headers.get(AliyunGatewayHttpConstants.HTTP_HEADER_CONTENT_TYPE)) {
-                sb.append(headers.get(AliyunGatewayHttpConstants.HTTP_HEADER_CONTENT_TYPE));
+            sb.append (SymbolConstants.LF);
+            if (null != headers.get (AliyunGatewayHttpConstants.HTTP_HEADER_CONTENT_TYPE)) {
+                sb.append (headers.get (AliyunGatewayHttpConstants.HTTP_HEADER_CONTENT_TYPE));
             }
-            sb.append(SymbolConstants.LF);
-            if (null != headers.get(AliyunGatewayHttpConstants.HTTP_HEADER_DATE)) {
-                sb.append(headers.get(AliyunGatewayHttpConstants.HTTP_HEADER_DATE));
+            sb.append (SymbolConstants.LF);
+            if (null != headers.get (AliyunGatewayHttpConstants.HTTP_HEADER_DATE)) {
+                sb.append (headers.get (AliyunGatewayHttpConstants.HTTP_HEADER_DATE));
             }
         }
-        sb.append(SymbolConstants.LF);
-        sb.append(buildHeaders(headers, signHeaderPrefixList));
-        sb.append(buildResource(path, querys, bodys));
+        sb.append (SymbolConstants.LF);
+        sb.append (buildHeaders (headers, signHeaderPrefixList));
+        sb.append (buildResource (path, querys, bodys));
 
-        return sb.toString();
+        return sb.toString ();
     }
 
     /**
@@ -128,46 +137,46 @@ public class SignUtil {
      * @return 待签名
      */
     private static String buildResource(String path, Map<String, String> querys, Map<String, String> bodys) {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder ();
 
-        if (!StringUtils.isBlank(path)) {
-            sb.append(path);
+        if (!StringUtils.isBlank (path)) {
+            sb.append (path);
         }
-        Map<String, String> sortMap = new TreeMap<String, String>();
+        Map<String, String> sortMap = new TreeMap<String, String> ();
         if (null != querys) {
-            for (Map.Entry<String, String> query : querys.entrySet()) {
-                if (!StringUtils.isBlank(query.getKey())) {
-                    sortMap.put(query.getKey(), query.getValue());
+            for (Map.Entry<String, String> query : querys.entrySet ()) {
+                if (!StringUtils.isBlank (query.getKey ())) {
+                    sortMap.put (query.getKey (), query.getValue ());
                 }
             }
         }
 
         if (null != bodys) {
-            for (Map.Entry<String, String> body : bodys.entrySet()) {
-                if (!StringUtils.isBlank(body.getKey())) {
-                    sortMap.put(body.getKey(), body.getValue());
+            for (Map.Entry<String, String> body : bodys.entrySet ()) {
+                if (!StringUtils.isBlank (body.getKey ())) {
+                    sortMap.put (body.getKey (), body.getValue ());
                 }
             }
         }
 
-        StringBuilder sbParam = new StringBuilder();
-        for (Map.Entry<String, String> item : sortMap.entrySet()) {
-            if (!StringUtils.isBlank(item.getKey())) {
-                if (0 < sbParam.length()) {
-                    sbParam.append(SymbolConstants.SPE3);
+        StringBuilder sbParam = new StringBuilder ();
+        for (Map.Entry<String, String> item : sortMap.entrySet ()) {
+            if (!StringUtils.isBlank (item.getKey ())) {
+                if (0 < sbParam.length ()) {
+                    sbParam.append (SymbolConstants.SPE3);
                 }
-                sbParam.append(item.getKey());
-                if (!StringUtils.isBlank(item.getValue())) {
-                    sbParam.append(SymbolConstants.SPE4).append(item.getValue());
+                sbParam.append (item.getKey ());
+                if (!StringUtils.isBlank (item.getValue ())) {
+                    sbParam.append (SymbolConstants.SPE4).append (item.getValue ());
                 }
             }
         }
-        if (0 < sbParam.length()) {
-            sb.append(SymbolConstants.SPE5);
-            sb.append(sbParam);
+        if (0 < sbParam.length ()) {
+            sb.append (SymbolConstants.SPE5);
+            sb.append (sbParam);
         }
 
-        return sb.toString();
+        return sb.toString ();
     }
 
     /**
@@ -178,57 +187,57 @@ public class SignUtil {
      * @return 待签名Http头
      */
     private static String buildHeaders(Map<String, String> headers, List<String> signHeaderPrefixList) {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder ();
 
         if (null != signHeaderPrefixList) {
-            signHeaderPrefixList.remove(AliyunGatewayHttpConstants.X_CA_SIGNATURE);
-            signHeaderPrefixList.remove(AliyunGatewayHttpConstants.HTTP_HEADER_ACCEPT);
-            signHeaderPrefixList.remove(AliyunGatewayHttpConstants.HTTP_HEADER_CONTENT_MD5);
-            signHeaderPrefixList.remove(AliyunGatewayHttpConstants.HTTP_HEADER_CONTENT_TYPE);
-            signHeaderPrefixList.remove(AliyunGatewayHttpConstants.HTTP_HEADER_DATE);
+            signHeaderPrefixList.remove (AliyunGatewayHttpConstants.X_CA_SIGNATURE);
+            signHeaderPrefixList.remove (AliyunGatewayHttpConstants.HTTP_HEADER_ACCEPT);
+            signHeaderPrefixList.remove (AliyunGatewayHttpConstants.HTTP_HEADER_CONTENT_MD5);
+            signHeaderPrefixList.remove (AliyunGatewayHttpConstants.HTTP_HEADER_CONTENT_TYPE);
+            signHeaderPrefixList.remove (AliyunGatewayHttpConstants.HTTP_HEADER_DATE);
 
-            List<String> signHeaderPrefixListNew = new ArrayList<>(signHeaderPrefixList);
-            Collections.sort(signHeaderPrefixListNew);
+            List<String> signHeaderPrefixListNew = new ArrayList<> (signHeaderPrefixList);
+            Collections.sort (signHeaderPrefixListNew);
             if (null != headers) {
-                Map<String, String> sortMap = new TreeMap<String, String>();
-                sortMap.putAll(headers);
-                StringBuilder signHeadersStringBuilder = new StringBuilder();
-                for (Map.Entry<String, String> header : sortMap.entrySet()) {
-                    if (isHeaderToSign(header.getKey(), signHeaderPrefixListNew)) {
-                        sb.append(header.getKey());
-                        sb.append(SymbolConstants.SPE2);
-                        if (!StringUtils.isBlank(header.getValue())) {
-                            sb.append(header.getValue());
+                Map<String, String> sortMap = new TreeMap<String, String> ();
+                sortMap.putAll (headers);
+                StringBuilder signHeadersStringBuilder = new StringBuilder ();
+                for (Map.Entry<String, String> header : sortMap.entrySet ()) {
+                    if (isHeaderToSign (header.getKey (), signHeaderPrefixListNew)) {
+                        sb.append (header.getKey ());
+                        sb.append (SymbolConstants.SPE2);
+                        if (!StringUtils.isBlank (header.getValue ())) {
+                            sb.append (header.getValue ());
                         }
-                        sb.append(SymbolConstants.LF);
-                        if (0 < signHeadersStringBuilder.length()) {
-                            signHeadersStringBuilder.append(SymbolConstants.SPE1);
+                        sb.append (SymbolConstants.LF);
+                        if (0 < signHeadersStringBuilder.length ()) {
+                            signHeadersStringBuilder.append (SymbolConstants.SPE1);
                         }
-                        signHeadersStringBuilder.append(header.getKey());
+                        signHeadersStringBuilder.append (header.getKey ());
                     }
                 }
-                headers.put(AliyunGatewayHttpConstants.X_CA_SIGNATURE_HEADERS, signHeadersStringBuilder.toString());
+                headers.put (AliyunGatewayHttpConstants.X_CA_SIGNATURE_HEADERS, signHeadersStringBuilder.toString ());
             }
         }
 
-        return sb.toString();
+        return sb.toString ();
     }
 
     /**
      * Http头是否参与签名 return
      */
     private static boolean isHeaderToSign(String headerName, List<String> signHeaderPrefixList) {
-        if (StringUtils.isBlank(headerName)) {
+        if (StringUtils.isBlank (headerName)) {
             return false;
         }
 
-        if (headerName.startsWith(AliyunGatewayHttpConstants.CA_HEADER_TO_SIGN_PREFIX_SYSTEM)) {
+        if (headerName.startsWith (AliyunGatewayHttpConstants.CA_HEADER_TO_SIGN_PREFIX_SYSTEM)) {
             return true;
         }
 
         if (null != signHeaderPrefixList) {
             for (String signHeaderPrefix : signHeaderPrefixList) {
-                if (headerName.equalsIgnoreCase(signHeaderPrefix)) {
+                if (headerName.equalsIgnoreCase (signHeaderPrefix)) {
                     return true;
                 }
             }
@@ -236,4 +245,20 @@ public class SignUtil {
 
         return false;
     }
+
+    private static Map<String, String> convertToMap(String str) {
+
+        Map<String, String> map = new HashMap<> ();
+        if (str != null) {
+            String[] split = str.split ("&");
+            for (String kv : split) {
+                String[] kvData = kv.split ("=");
+                map.put (StringUtils.trim (kvData[0]), StringUtils.trim (kvData[1]));
+            }
+        }
+
+        return map;
+    }
+
+
 }
